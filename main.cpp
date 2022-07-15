@@ -8,7 +8,7 @@
 #include <array>
 #include <direct.h>
 
-static const int c_numPoints = 100;
+static const int c_numPoints = 500;
 #define DETERMINISTIC() true
 
 
@@ -201,7 +201,7 @@ float MinDistanceBetweenBaryPoints(const Vec3& candidatePos, const Vec3& point)
     return distance;
 }
 
-void DrawPoints(const std::vector<Vec3>& points)
+void DrawPoints(const std::vector<Vec3>& points, int pointCount, const char* fileName)
 {
     float minx = std::min(PointA[0], std::min(PointB[0], PointC[0]));
     float maxx = std::max(PointA[0], std::max(PointB[0], PointC[0]));
@@ -242,8 +242,10 @@ void DrawPoints(const std::vector<Vec3>& points)
             }
 
             // handle points
-            for (const Vec3& point : points)
+            for (size_t pointIndex = 0; pointIndex < pointCount; ++pointIndex)
             {
+                const Vec3& point = points[pointIndex];
+
                 Vec2 pointCar = BarycentricToCartesian(point, PointA, PointB, PointC);
 
                 float dist = Length(pointCar - uv);
@@ -262,7 +264,7 @@ void DrawPoints(const std::vector<Vec3>& points)
         }
     }
 
-    stbi_write_png("out/points.png", c_imgSize, c_imgSize, 3, pixels.data(), 0);
+    stbi_write_png(fileName, c_imgSize, c_imgSize, 3, pixels.data(), 0);
 }
 
 int main(int argc, char** argv)
@@ -313,7 +315,25 @@ int main(int argc, char** argv)
         points.push_back(bestCandidatePos);
     }
 
-    DrawPoints(points);
+    DrawPoints(points, int(float(points.size() * 0.1f)), "out/points_10.png");
+    DrawPoints(points, int(float(points.size() * 0.25f)), "out/points_25.png");
+    DrawPoints(points, int(float(points.size() * 0.50f)), "out/points_50.png");
+    DrawPoints(points, int(float(points.size() * 0.75f)), "out/points_75.png");
+    DrawPoints(points, int(points.size()), "out/points_100.png");
+
+
+    // write out file
+    {
+        FILE* file = nullptr;
+        fopen_s(&file, "out/points.txt", "w+t");
+
+        fprintf(file, "Barycentric coordinates of blue noise points on an equilateral triangle\n\n");
+
+        for (Vec3& point : points)
+            fprintf(file, "    {%f, %f, %f},\n", point[0], point[1], point[2]);
+
+        fclose(file);
+    }
 
     return 0;
 }
