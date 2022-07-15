@@ -64,12 +64,27 @@ std::array<T, N> operator*(const std::array<T, N>& A, const T& B)
 }
 
 template <typename T, size_t N>
+std::array<T, N> operator/(const std::array<T, N>& A, const T& B)
+{
+    std::array<T, N> ret;
+    for (size_t i = 0; i < N; ++i)
+        ret[i] = A[i] / B;
+    return ret;
+}
+
+template <typename T, size_t N>
 T Dot(const std::array<T, N>& A, const std::array<T, N>& B)
 {
     T ret = T(0);
     for (size_t i = 0; i < N; ++i)
         ret += A[i] * B[i];
     return ret;
+}
+
+template <typename T, size_t N>
+T Length(const std::array<T, N>& A)
+{
+    return sqrtf(Dot(A, A));
 }
 
 float SmoothStep(float edge0, float edge1, float x)
@@ -151,15 +166,33 @@ Vec2 BarycentricToCartesian(const Vec3& bary, const Vec2& A, const Vec2& B, cons
     return A * bary[0] + B * bary[1] + C * bary[2];
 }
 
+Vec2 ReflectPoint(const Vec2& P, const Vec2& A, const Vec2& B)
+{
+    Vec2 AB = B - A;
+    Vec2 ABNorm = AB / Length(AB);
+
+    float t = Dot(P - A, ABNorm);
+    Vec2 linePoint = A + ABNorm * t;
+
+    Vec2 PToLine = (P - linePoint);
+    return P - PToLine * 2.0f;
+}
+
 float MinDistanceBetweenBaryPoints(const Vec3& candidatePos, const Vec3& point)
 {
     Vec2 A = BarycentricToCartesian(candidatePos, PointA, PointB, PointC);
     Vec2 B = BarycentricToCartesian(point, PointA, PointB, PointC);
 
     // direct distance
-    float distance = sqrtf(Dot(B - A, B - A));
+    float distance = Length(B - A);
 
-    // TODO: deal with edges!
+    // TODO: this isn't handling edges correctly
+
+    // reflect one of the points across each edge and keep the minimum distance found
+    distance = std::min(distance, Length(ReflectPoint(B, PointA, PointB) - A));
+    distance = std::min(distance, Length(ReflectPoint(B, PointB, PointC) - A));
+    distance = std::min(distance, Length(ReflectPoint(B, PointC, PointA) - A));
+
     return distance;
 }
 
@@ -179,7 +212,6 @@ void DrawPoints(const std::vector<Vec3>& points)
     unsigned char* pixel = pixels.data();
     for (int iy = 0; iy < c_imgSize; ++iy)
     {
-        // TODO: offset uv.y by offsety.
         Vec2 uv = { 0.0f, 1.0f - (offsety + float(iy) / float(c_imgSize)) };
         for (int ix = 0; ix < c_imgSize; ++ix)
         {
@@ -207,12 +239,39 @@ void DrawPoints(const std::vector<Vec3>& points)
             {
                 Vec2 pointCar = BarycentricToCartesian(point, PointA, PointB, PointC);
 
-                float dist = sqrt(Dot(pointCar - uv, pointCar - uv));
+                float dist = Length(pointCar - uv);
                 float shade = 1.0f - SmoothStep(0.0025f, 0.01f, dist);
 
                 color[0] = Lerp(color[0], 0.0f, shade);
                 color[1] = Lerp(color[1], 0.0f, shade);
                 color[2] = Lerp(color[2], 1.0f, shade);
+            }
+
+            // TODO: temp test
+            {
+                Vec3 p = points[0];
+                {
+                    Vec2 pointCar = BarycentricToCartesian(p, PointA, PointB, PointC);
+
+                    float dist = Length(pointCar - uv);
+                    float shade = 1.0f - SmoothStep(0.0025f, 0.01f, dist);
+
+                    color[0] = Lerp(color[0], 1.0f, shade);
+                    color[1] = Lerp(color[1], 0.0f, shade);
+                    color[2] = Lerp(color[2], 0.0f, shade);
+                }
+                {
+                    Vec2 pointCar = BarycentricToCartesian(p, PointA, PointB, PointC);
+                    Vec2 pointRefl = ReflectPoint(pointCar, PointA, PointB);
+                    pointCar = pointRefl;
+
+                    float dist = Length(pointCar - uv);
+                    float shade = 1.0f - SmoothStep(0.0025f, 0.01f, dist);
+
+                    color[0] = Lerp(color[0], 0.0f, shade);
+                    color[1] = Lerp(color[1], 1.0f, shade);
+                    color[2] = Lerp(color[2], 0.0f, shade);
+                }
             }
 
             pixel[0] = (unsigned char)Clamp(color[0] * 255.0f, 0.0f, 255.0f);
