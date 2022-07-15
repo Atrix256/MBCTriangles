@@ -9,7 +9,7 @@
 #include <direct.h>
 
 static const int c_numPoints = 500;
-#define DETERMINISTIC() true
+#define DETERMINISTIC() false
 
 
 typedef std::array<float, 2> Vec2;
@@ -186,6 +186,7 @@ float MinDistanceBetweenBaryPoints(const Vec3& candidatePos, const Vec3& point)
     // direct distance
     float distance = Length(B - A);
 
+#if 0
     // reflect one of the points across each edge and keep the minimum distance found
     distance = std::min(distance, Length(ReflectPoint(B, PointA, PointB) - A));
     distance = std::min(distance, Length(ReflectPoint(B, PointB, PointC) - A));
@@ -196,6 +197,7 @@ float MinDistanceBetweenBaryPoints(const Vec3& candidatePos, const Vec3& point)
     distance = std::min(distance, Length(ReflectPoint(A, PointB, PointC) - A));
     distance = std::min(distance, Length(ReflectPoint(A, PointC, PointA) - A));
 
+#endif
     // TODO: this doesn't handle other edges being against this edge. (rotations?) need to do that.
 
     return distance;
@@ -267,6 +269,87 @@ void DrawPoints(const std::vector<Vec3>& points, int pointCount, const char* fil
     stbi_write_png(fileName, c_imgSize, c_imgSize, 3, pixels.data(), 0);
 }
 
+void DrawPointsRepeating(const std::vector<Vec3>& points, int pointCount, const char* fileName)
+{
+    float minx = std::min(PointA[0], std::min(PointB[0], PointC[0]));
+    float maxx = std::max(PointA[0], std::max(PointB[0], PointC[0]));
+    float miny = std::min(PointA[1], std::min(PointB[1], PointC[1]));
+    float maxy = std::max(PointA[1], std::max(PointB[1], PointC[1]));
+
+    float offsety = 0.5f - (maxy - miny) / 2.0f;
+
+    static const int c_imgSize = 512;
+
+    std::vector<unsigned char> pixels(c_imgSize * c_imgSize * 3, 255);
+
+    unsigned char* pixel = pixels.data();
+    for (int iy = 0; iy < c_imgSize; ++iy)
+    {
+        for (int ix = 0; ix < c_imgSize; ++ix)
+        {
+            Vec2 uv = { float(ix) / float(c_imgSize), 1.0f - (offsety + float(iy) / float(c_imgSize)) };
+            uv = uv * 2.0f;
+            uv[0] = uv[0] - 0.5f;
+            uv[1] = uv[1] - 0.5f;
+
+            Vec3 bary = Barycentric(uv, PointA, PointB, PointC);
+
+            Vec3 color = Vec3{ 1.0f, 1.0f, 1.0f };
+
+            // handle points
+            for (size_t pointIndex = 0; pointIndex < pointCount; ++pointIndex)
+            {
+                const Vec3& point = points[pointIndex];
+
+                Vec2 pointCar = BarycentricToCartesian(point, PointA, PointB, PointC);
+
+                {
+                    float dist = Length(pointCar - uv);
+                    float shade = 1.0f - SmoothStep(0.0025f, 0.01f, dist);
+
+                    color[0] = Lerp(color[0], 0.0f, shade);
+                    color[1] = Lerp(color[1], 0.0f, shade);
+                    color[2] = Lerp(color[2], 1.0f, shade);
+                }
+
+                {
+                    float dist = Length(ReflectPoint(pointCar, PointA, PointB) - uv);
+                    float shade = 1.0f - SmoothStep(0.0025f, 0.01f, dist);
+
+                    color[0] = Lerp(color[0], 0.0f, shade);
+                    color[1] = Lerp(color[1], 0.0f, shade);
+                    color[2] = Lerp(color[2], 1.0f, shade);
+                }
+
+                {
+                    float dist = Length(ReflectPoint(pointCar, PointB, PointC) - uv);
+                    float shade = 1.0f - SmoothStep(0.0025f, 0.01f, dist);
+
+                    color[0] = Lerp(color[0], 0.0f, shade);
+                    color[1] = Lerp(color[1], 0.0f, shade);
+                    color[2] = Lerp(color[2], 1.0f, shade);
+                    {
+                        float dist = Length(ReflectPoint(pointCar, PointC, PointA) - uv);
+                        float shade = 1.0f - SmoothStep(0.0025f, 0.01f, dist);
+
+                        color[0] = Lerp(color[0], 0.0f, shade);
+                        color[1] = Lerp(color[1], 0.0f, shade);
+                        color[2] = Lerp(color[2], 1.0f, shade);
+                    }
+                }
+            }
+
+            pixel[0] = (unsigned char)Clamp(color[0] * 255.0f, 0.0f, 255.0f);
+            pixel[1] = (unsigned char)Clamp(color[1] * 255.0f, 0.0f, 255.0f);
+            pixel[2] = (unsigned char)Clamp(color[2] * 255.0f, 0.0f, 255.0f);
+
+            pixel += 3;
+        }
+    }
+
+    stbi_write_png(fileName, c_imgSize, c_imgSize, 3, pixels.data(), 0);
+}
+
 int main(int argc, char** argv)
 {
     _mkdir("out");
@@ -321,6 +404,11 @@ int main(int argc, char** argv)
     DrawPoints(points, int(float(points.size() * 0.75f)), "out/points_75.png");
     DrawPoints(points, int(points.size()), "out/points_100.png");
 
+    DrawPointsRepeating(points, int(float(points.size() * 0.1f)), "out/points_r_10.png");
+    DrawPointsRepeating(points, int(float(points.size() * 0.25f)), "out/points_r_25.png");
+    DrawPointsRepeating(points, int(float(points.size() * 0.50f)), "out/points_r_50.png");
+    DrawPointsRepeating(points, int(float(points.size() * 0.75f)), "out/points_r_75.png");
+    DrawPointsRepeating(points, int(points.size()), "out/points_r_100.png");
 
     // write out file
     {
