@@ -418,7 +418,7 @@ int main(int argc, char** argv)
         fprintf(file, "Barycentric coordinates of blue noise points on an equilateral triangle\n\n");
 
         for (Vec3& point : points)
-            fprintf(file, "    {%f, %f, %f},\n", point[0], point[1], point[2]);
+            fprintf(file, "    {%f, %f},\n", point[0], point[1]);
 
         fclose(file);
     }
