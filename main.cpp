@@ -186,12 +186,15 @@ float MinDistanceBetweenBaryPoints(const Vec3& candidatePos, const Vec3& point)
     // direct distance
     float distance = Length(B - A);
 
-    // TODO: this isn't handling edges correctly
-
     // reflect one of the points across each edge and keep the minimum distance found
     distance = std::min(distance, Length(ReflectPoint(B, PointA, PointB) - A));
     distance = std::min(distance, Length(ReflectPoint(B, PointB, PointC) - A));
     distance = std::min(distance, Length(ReflectPoint(B, PointC, PointA) - A));
+
+    // Also check the candidate point against it's reflected self
+    distance = std::min(distance, Length(ReflectPoint(A, PointA, PointB) - A));
+    distance = std::min(distance, Length(ReflectPoint(A, PointB, PointC) - A));
+    distance = std::min(distance, Length(ReflectPoint(A, PointC, PointA) - A));
 
     return distance;
 }
@@ -205,17 +208,19 @@ void DrawPoints(const std::vector<Vec3>& points)
 
     float offsety = 0.5f - (maxy - miny) / 2.0f;
 
-    static const int c_imgSize = 256;
+    static const int c_imgSize = 512;
 
     std::vector<unsigned char> pixels(c_imgSize * c_imgSize * 3, 255);
 
     unsigned char* pixel = pixels.data();
     for (int iy = 0; iy < c_imgSize; ++iy)
     {
-        Vec2 uv = { 0.0f, 1.0f - (offsety + float(iy) / float(c_imgSize)) };
         for (int ix = 0; ix < c_imgSize; ++ix)
         {
-            uv[0] = float(ix) / float(c_imgSize);
+            Vec2 uv = { float(ix) / float(c_imgSize), 1.0f - (offsety + float(iy) / float(c_imgSize)) };
+            uv = uv * 2.0f;
+            uv[0] = uv[0] - 0.5f;
+            uv[1] = uv[1] - 0.5f;
 
             Vec3 bary = Barycentric(uv, PointA, PointB, PointC);
 
@@ -245,33 +250,6 @@ void DrawPoints(const std::vector<Vec3>& points)
                 color[0] = Lerp(color[0], 0.0f, shade);
                 color[1] = Lerp(color[1], 0.0f, shade);
                 color[2] = Lerp(color[2], 1.0f, shade);
-            }
-
-            // TODO: temp test
-            {
-                Vec3 p = points[0];
-                {
-                    Vec2 pointCar = BarycentricToCartesian(p, PointA, PointB, PointC);
-
-                    float dist = Length(pointCar - uv);
-                    float shade = 1.0f - SmoothStep(0.0025f, 0.01f, dist);
-
-                    color[0] = Lerp(color[0], 1.0f, shade);
-                    color[1] = Lerp(color[1], 0.0f, shade);
-                    color[2] = Lerp(color[2], 0.0f, shade);
-                }
-                {
-                    Vec2 pointCar = BarycentricToCartesian(p, PointA, PointB, PointC);
-                    Vec2 pointRefl = ReflectPoint(pointCar, PointA, PointB);
-                    pointCar = pointRefl;
-
-                    float dist = Length(pointCar - uv);
-                    float shade = 1.0f - SmoothStep(0.0025f, 0.01f, dist);
-
-                    color[0] = Lerp(color[0], 0.0f, shade);
-                    color[1] = Lerp(color[1], 1.0f, shade);
-                    color[2] = Lerp(color[2], 0.0f, shade);
-                }
             }
 
             pixel[0] = (unsigned char)Clamp(color[0] * 255.0f, 0.0f, 255.0f);
