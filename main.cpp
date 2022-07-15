@@ -196,6 +196,8 @@ float MinDistanceBetweenBaryPoints(const Vec3& candidatePos, const Vec3& point)
     distance = std::min(distance, Length(ReflectPoint(A, PointB, PointC) - A));
     distance = std::min(distance, Length(ReflectPoint(A, PointC, PointA) - A));
 
+    // TODO: this doesn't handle other edges being against this edge. (rotations?) need to do that.
+
     return distance;
 }
 
